@@ -8,7 +8,7 @@
         l->y1 = _y1; \
         if (_x1 - _x0 == 0) l->ver = 1; \
         else l->ver = 0; \
-        if (_y1 - _y0 == 0) l->hor = 1; \
+        if (fabs(_y1, _y0) <= 0.2) l->hor = 1; \
         else l->hor = 0; \
         l->m = (_y1 - _y0) / (_x1 - _x0); \
         lines[line_n++] = l;
@@ -20,14 +20,14 @@
     float _ctx_y = 0.0; \
     _ctx_x = _x0; \
     _ctx_y = _y0; \
-    add_line(_x0, _y0, _x2, _y2); \
-    /*for (float t = 0; t <= 1; t += 0.49f) { \
+/*    add_line(_x0, _y0, _x2, _y2); */\
+    for (float t = 0.5f; t <= 1; t += 0.5f) { \
         Bx = _x1 + (1.f - t) * (1.f - t) * (_x0 - _x1) + t * t * (_x2 - _x1); \
         By = _y1 + (1.f - t) * (1.f - t) * (_y0 - _y1) + t * t * (_y2 - _y1); \
         add_line(_ctx_x, _ctx_y, Bx, By); \
         _ctx_x = Bx; \
         _ctx_y = By; \
-    }*/
+    }
         
 
 uint16_t pixbuf_w;
@@ -94,7 +94,10 @@ void sort(float* arr, uint16_t n)
 void printbuf(GLYF_PIXBUF* px) {
      for (uint16_t r = 0; r < px->h; r++) {
         for (uint16_t c = 0; c < px->w; c++) {
-            ttf_log_r("%c", px->buf[r * px->w + c] == 0xff? '#' : ' ');
+            uint8_t bri = px->buf[r * px->w + c];
+            if (bri == 0xff) ttf_log_r("%c",'#');
+            else if (bri > 0) ttf_log_r("%c",'%');
+            else ttf_log_r(" ");
         }
         ttf_log_r("\n|");
     } 
@@ -279,7 +282,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     ttf_log_r("grid-width: %d x %d, grid-x: [%d, %d], grid-y: [%d, %d], offset: [%f, %f]\n", 
             pixbuf->w, pixbuf->h, x_min, x_max, y_min, y_max, offset_x, offset_y);
 
-    _LINE** lines = (_LINE**) malloc(gdata->coords_n * 2 * 2 * sizeof(_LINE*));
+    _LINE** lines = (_LINE**) malloc((gdata->coords_n * 2 * 2 + 1) * sizeof(_LINE*));
     uint16_t line_n = 0;
 
     for (uint16_t i = 0; i < gdata->coords_n; i++) {
@@ -374,24 +377,25 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
         _LINE* li = lines[i];
         _LINE* lo = lines[(i + 1) % line_n];
         
-        if () {
+        if (li->hor || lo->hor) continue;
+        if ((li->y0 <= li->y1 && lo->y1 <= li->y1) 
+            || (li->y0 >= li->y1 && lo->y1 >= li->y1)) {
             _POINT* p = malloc(sizeof(_POINT));
             p->x = lines[i]->x1;
             p->y = lines[i]->y1;
-            //blacklist[blacklist_n++] = p;
+            blacklist[blacklist_n++] = p;
             //lines[li]->y1 -= .3333;
             printf("BLACKLISTING POINT (%f, %f)", p->x, p->y);
         }
 
-        if (li->hor || lo->hor) continue;
-        float cos_t = l_angle(li, lo);
+        /*float cos_t = l_angle(li, lo);
         if (cos_t < 1.5707f && cos_t > 0) {
             _POINT* p = malloc(sizeof(_POINT));
             p->x = li->x1;
             p->y = li->y1;
             blacklist[blacklist_n++] = p;
             printf("POINT (%f, %f) is ACCUTE\n", p->x, p->y);
-        }                                       
+        }                                       */
     }
 
     ttf_log_r("colected %d lines\n", line_n);
@@ -409,6 +413,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                 float x_end = l->x0 < l->x1? l->x1 : l->x0;
                 l->m = (l->y1 - l->y0) / (l->x1 - l->x0);
                 ttf_log_r("simuating over [%f, %f] with m=%f\n", x_start, x_end, l->m);
+                if (x_end - x_start < 0.005) continue;
                 for (float x = x_start - 0.01; x < x_end; x += 0.005f / fabs(l->m, 0)) {
                     float y_calc = l->m * (x - l->x0) + l->y0; 
                     //ttf_log_r("%.1f/%.1f ", y_calc, fabs(y_calc, y) );
@@ -458,20 +463,23 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                     goto blacklisted;
                     }
                 }
-                float d2 = (x_i - blacklist[j]->x) 
-                         * (x_i - blacklist[j]->x)
-                         + (y - blacklist[j]->y) * 0.001
-                         * (y - blacklist[j]->y);
-                if (d2 < 0.00005f) {
-                    printf("SKIPPING %f because of (%f, %f) on y=%d\n",
-                        x_i, blacklist[j]->x, blacklist[j]->y, y);
-                    goto blacklisted;
+                if (fabs(y, blacklist[j]->y) < 0.05f) {
+                    float d2 = (x_i - blacklist[j]->x) 
+                             * (x_i - blacklist[j]->x);
+                             /*+ (y - blacklist[j]->y) * 0.001
+                             * (y - blacklist[j]->y);*/
+                    printf("considering to skip %f with d: %f\n", x_i, fabs(x_i, blacklist[j]->x));
+                    if (fabs(x_i, blacklist[j]->x) < 0.2) {
+                        printf("SKIPPING %f because of (%f, %f) on y=%d\n",
+                            x_i, blacklist[j]->x, blacklist[j]->y, y);
+                        goto blacklisted;
+                    }
                 }
             }
 
             // filter out points that are very close to each other
             float d = fabs(x_ints[i], x_ints[i + 1]);
-            if (fabs(x_ints[i], x_ints[i + 1]) < 0.333 / scale_f) continue;
+            if (fabs(x_ints[i], x_ints[i + 1]) < 0.5 / scale_f) continue;
             else
                 filtered_x[m++] = x_ints[i];
 blacklisted:
@@ -482,12 +490,12 @@ blacklisted:
         x_ints_n = m;
         for (uint16_t i = 0; i < x_ints_n; i += 2) {
             if (i - 1 < x_ints_n) {
-                if (fabs(x_ints[i], x_ints[i + 1]) < 0.1f) { 
+                /*if (fabs(x_ints[i], x_ints[i + 1]) < 0.1f) { 
                     ttf_log_r("SKIPPING CLOSE PointS: %f, %f", 
                             x_ints[i], x_ints[i + 1]);
                     i--;
                     continue;
-                }
+                }*/
                 ttf_log_r("COLOR x=[%f, %f], ", x_ints[i], x_ints[i + 1]);
                 uint16_t x_start = x_ints[i];
                 uint16_t x_end = x_ints[i + 1];
@@ -503,6 +511,56 @@ blacklisted:
         _LINE* l = lines[i];
         draw_line(pixbuf, l->x0, l->y0, l->x1, l->y1);
     }
+    
+    // filter out black single pixel lines
+    uint16_t last_start = 0;
+    uint8_t black_count = 0;
+    uint8_t counting = 0;
+    for (uint16_t r = 1; r < pixbuf->h - 1; r++) {
+        for (uint16_t c = 0; c < pixbuf->w; c++) {
+            uint8_t bri = pixbuf->buf[r * pixbuf->w + c];
+            uint8_t bri_above = pixbuf->buf[(r-1) * pixbuf->w + c];
+            uint8_t bri_below = pixbuf->buf[(r+1) * pixbuf->w + c];
+            if (bri > 10 && counting == 0 && bri_above < 10 && bri_below < 10) {
+                counting = 1;
+                last_start = c;
+            }
+            if (bri > 10 && counting != 0 && (bri_above > 10 || bri_below > 10)) {
+                for (uint16_t i = last_start; i < c + 1; i++) {
+                    pixbuf->buf[r * pixbuf->w + i] = 0x0;
+                }
+                counting = 0; 
+                last_start = 0;
+            }
+        }
+        ttf_log_r("\n|");
+    } 
+
+    last_start = 0;
+    counting = 0;
+    for (uint16_t r = 1; r < pixbuf->h - 1; r++) {
+        for (uint16_t c = 0; c < pixbuf->w; c++) {
+            uint8_t bri = pixbuf->buf[r * pixbuf->w + c];
+            uint8_t bri_above = pixbuf->buf[(r-1) * pixbuf->w + c];
+            uint8_t bri_below = pixbuf->buf[(r+1) * pixbuf->w + c];
+            if (bri < 0xff && counting == 0 && bri_above > 30 && bri_below > 30) {
+                counting = 1;
+                last_start = c;
+                printf("START AT %d", c);
+            }
+            if (counting != 0 && (bri > 50 || bri_above < 10 || bri_below < 10)) {
+                if (c + 1 - last_start + 1 > 4) {
+                    for (uint16_t i = last_start; i < c + 1; i++) {
+                        pixbuf->buf[r * pixbuf->w + i] = 0xff;
+                    }
+                }
+                counting = 0; 
+                last_start = 0;
+            }
+        }
+        ttf_log_r("\n|");
+    } 
+ 
 
     uint8_t* ref = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
 

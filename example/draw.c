@@ -26,7 +26,7 @@ gint main (gint argc, gchar **argv) {
     gtk_widget_set_size_request (canvas, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
     TTF_FONT* font = NULL;
-    extract_font_from_file("nobuntu.ttf", &font);
+    extract_font_from_file("ubuntu.ttf", &font);
 
     printf("Font data loaded at 0x%x", font);
 
@@ -43,7 +43,7 @@ gint main (gint argc, gchar **argv) {
     return 0;
 }
 
-uint8_t drawed = 0;
+uint8_t drawed = 1;
 
 void cr_set_pixel(cairo_t* cr, uint16_t x, uint16_t y) {
     cairo_rectangle (cr, x, y, 1, 1);
@@ -94,13 +94,11 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
         ttf_log("Loa35d glyfs at 0x%x\n", font->glyfs);
         uint8_t f = 19;
 
-        TTF_GLYF* glyf = font->glyfs[19];
-        GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 30.0);
+        TTF_GLYF* glyf = font->glyfs[19 + 9];
+        GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 10);
         printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
         draw_glyf(cr, pixbuf, 20, 20);
         
-
-/*
        for (uint32_t g = f; g < f + 80; g++) {
            TTF_GLYF* glyf = font->glyfs[g];
            printf("GLYF #%d", g);
@@ -108,7 +106,7 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
             if (pixbuf == NULL) continue;
             printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
             draw_glyf(cr, pixbuf, 20 + ((g - f) * 85) % 700, 20 + ((g - f) / 10) * 100);
-        }*/
+        }
 
     }
 

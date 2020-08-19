@@ -74,6 +74,30 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
     return table;
 }
 
+TTF_TABLE_CMAP* read_table_cmap(uint8_t* loc) {
+    uint32_t cur = 0;
+    TTF_TABLE_CMAP* table = calloc(1, sizeof(TTF_TABLE_CMAP));
+    table->version = read_uint16(loc, &cur);
+    table->encs_n = read_uint16(loc, &cur);
+
+    table->encs = (TTF_ENCODING_RECORD**) malloc(
+        table->encs_n * sizeof(TTF_ENCODING_RECORD*));
+
+    for (uint16_t i = 0; i < table->encs_n; i++) {
+        TTF_ENCODING_RECORD* record = (TTF_ENCODING_RECORD*) malloc(
+            sizeof(TTF_ENCODING_RECORD));
+        record->platform = read_uint16(loc, &cur);
+        record->enc_id = read_uint16(loc, &cur);
+        record->offset = read_uint32(loc, &cur);
+        printf("Found record at 0x%x", record->offset);
+        table->encs[i] = record;
+    }
+
+    return table;
+}
+
+ 
+
 TTF_GLYF* read_glyf(uint8_t* loc) {
     uint32_t cur = 0;
     TTF_GLYF* table = malloc(sizeof(TTF_GLYF));

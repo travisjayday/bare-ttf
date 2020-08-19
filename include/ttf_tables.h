@@ -93,8 +93,29 @@ typedef struct {
 
 } TTF_GLYF_COMP_D;
 
+typedef struct {
+    uint16_t platform;
+    uint16_t enc_id;
+    uint32_t offset;
+} TTF_ENCODING_RECORD;
+
+typedef struct {
+    uint16_t format;
+    uint16_t len;
+    uint16_t lan;
+    uint8_t* glyfID; 
+} TTF_CMAP_FMT1;
+
+typedef struct {
+    uint16_t version;
+    uint16_t encs_n;
+    TTF_ENCODING_RECORD** encs; 
+} TTF_TABLE_CMAP;
+ 
+
 
 TTF_TABLE_HEAD* read_table_head(uint8_t* loc);
+TTF_TABLE_CMAP* read_table_cmap(uint8_t* loc);
 TTF_TABLE_MAXP* read_table_maxp(uint8_t* loc);
 TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, 
         uint32_t glyfs_n, uint8_t idx_to_loc_f);

@@ -19,11 +19,13 @@ void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
     TTF_TABLE_HEAD* head_t;
     TTF_TABLE_MAXP* maxp_t;
     TTF_TABLE_LOCA* loca_t;
+    TTF_TABLE_CMAP* cmap_t;
 
     uint8_t table_idx_maxp = -1;
     uint8_t table_idx_head = -1;
     uint8_t table_idx_glyf = -1;
     uint8_t table_idx_loca = -1;
+    uint8_t table_idx_cmap = -1;
 
     for (uint8_t i = 0; i < num_tables; i++) {
         tables[i] = malloc(sizeof(TTF_TABLE));
@@ -49,6 +51,7 @@ void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
         else if (strcmp(tables[i]->tag, "maxp") == 0) table_idx_maxp = i;
         else if (strcmp(tables[i]->tag, "loca") == 0) table_idx_loca = i;
         else if (strcmp(tables[i]->tag, "glyf") == 0) table_idx_glyf = i;
+        else if (strcmp(tables[i]->tag, "cmap") == 0) table_idx_cmap = i;
     }
     
     // Read head table
@@ -56,6 +59,7 @@ void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
     maxp_t = read_table_maxp(buf + tables[table_idx_maxp]->offset);
     loca_t = read_table_loca(buf + tables[table_idx_loca]->offset, 
             maxp_t->glyfs_n, head_t->idx_to_loc_f);
+    cmap_t = read_table_cmap(buf + tables[table_idx_cmap]->offset);
 
     ttf_log("Head Table\n------------\n");
     ttf_log("Version: %d.%d Rev %d\n", head_t->major_v, 
@@ -70,15 +74,34 @@ void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
     ttf_log("Max Contours: %d\n", maxp_t->max_cont);
     ttf_log("Max Composite Points: %d\n", maxp_t->max_comp_pts);
 
+    ttf_log("CMAP Table\n--------------\n");
+    ttf_log("Version: 0x%x\n", cmap_t->version);
+    ttf_log("Encodings #: %d\n", cmap_t->encs_n);
+
+    uint32_t cmap_base = tables[table_idx_cmap]->offset;
+    for (uint16_t i = 0; i < cmap_t->encs_n; i++) {
+        TTF_ENCODING_RECORD* record = cmap_t->encs[i];
+        ttf_log("Found Platform Encoding: %d.%d\n", record->platform, record->enc_id);
+        uint32_t loc = 0;
+        uint16_t format = read_uint16(buf + cmap_base + record->offset, &loc);
+        uint16_t len = read_uint16(buf + cmap_base + record->offset, &loc);
+        uint16_t lan = read_uint16(buf + cmap_base + record->offset, &loc);
+        ttf_log("With format: %d\n", format);
+        ttf_log("and len: %d, and lan: %d\n", len, lan); 
+        if (format == 0) {
+            uint8_t* glyfIdArr = buf + cmap_base + record->offset + 6;
+            printf("Char 0 is at %d", *(glyfIdArr + '1'));
+        }
+    }
 
     uint32_t glyf_base = tables[table_idx_glyf]->offset;
     TTF_GLYF** glyfs = malloc(sizeof(TTF_GLYF*) * maxp_t->glyfs_n);
 
     for (uint32_t i = 0; i < maxp_t->glyfs_n; i++) {
-        ttf_log("Found glyph at 0x%x\n", loca_t->glyf_offsets[i]);
+        //ttf_log("Found glyph at 0x%x\n", loca_t->glyf_offsets[i]);
         TTF_GLYF* glyf = read_glyf(buf + glyf_base + loca_t->glyf_offsets[i]);
-        ttf_log("cont_n: %d\n; x: [%d, %d], y: [%d, %d]\n", glyf->cont_n, 
-                glyf->x_min, glyf->x_max, glyf->y_min, glyf->y_max);
+        //ttf_log("cont_n: %d\n; x: [%d, %d], y: [%d, %d]\n", glyf->cont_n, 
+         //       glyf->x_min, glyf->x_max, glyf->y_min, glyf->y_max);
 
         if (glyf->cont_n <= 0) {
             ttf_log("Skipping compound Glyf");
@@ -91,8 +114,8 @@ void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
                 buf + glyf_base + loca_t->glyf_offsets[i] + sizeof(int16_t) * 5, glyf);
         glyf->data = (void*) gdata;
 
-        ttf_log("%d coordinates found\n", gdata->coords_n);
-        ttf_log("Strored gdata at 0x%x", gdata);
+//        ttf_log("%d coordinates found\n", gdata->coords_n);
+//       ttf_log("Strored gdata at 0x%x", gdata);
 
         glyfs[i] = glyf;
     }
