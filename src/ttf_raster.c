@@ -27,7 +27,7 @@
         add_line(_ctx_x, _ctx_y, Bx, By); \
         _ctx_x = Bx; \
         _ctx_y = By; \
-    } */
+    }*/
         
 
 uint16_t pixbuf_w;
@@ -279,7 +279,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     ttf_log_r("grid-width: %d x %d, grid-x: [%d, %d], grid-y: [%d, %d], offset: [%f, %f]\n", 
             pixbuf->w, pixbuf->h, x_min, x_max, y_min, y_max, offset_x, offset_y);
 
-    _LINE** lines = (_LINE**) malloc(100 * sizeof(_LINE*));
+    _LINE** lines = (_LINE**) malloc(gdata->coords_n * 2 * 2 * sizeof(_LINE*));
     uint16_t line_n = 0;
 
     for (uint16_t i = 0; i < gdata->coords_n; i++) {
@@ -371,10 +371,10 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     _POINT** blacklist = (_POINT**) malloc((line_n + 1) * sizeof(_POINT*));
     uint16_t blacklist_n = 0;
     for (uint16_t i = 0; i < line_n; i++) {
-        uint16_t li = i;
-        uint16_t lo = (i + 1) % line_n;
+        _LINE* li = lines[i];
+        _LINE* lo = lines[(i + 1) % line_n];
         
-        if (fabs(lines[li]->y1, (uint32_t) lines[li]->y1) < 0.0001) {
+        if () {
             _POINT* p = malloc(sizeof(_POINT));
             p->x = lines[i]->x1;
             p->y = lines[i]->y1;
@@ -383,12 +383,12 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
             printf("BLACKLISTING POINT (%f, %f)", p->x, p->y);
         }
 
-        if (lines[li]->hor || lines[lo]->hor) continue;
-        float cos_t = l_angle(lines[li], lines[lo]);
+        if (li->hor || lo->hor) continue;
+        float cos_t = l_angle(li, lo);
         if (cos_t < 1.5707f && cos_t > 0) {
             _POINT* p = malloc(sizeof(_POINT));
-            p->x = lines[i]->x1;
-            p->y = lines[i]->y1;
+            p->x = li->x1;
+            p->y = li->y1;
             blacklist[blacklist_n++] = p;
             printf("POINT (%f, %f) is ACCUTE\n", p->x, p->y);
         }                                       
