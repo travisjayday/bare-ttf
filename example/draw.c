@@ -26,7 +26,7 @@ gint main (gint argc, gchar **argv) {
     gtk_widget_set_size_request (canvas, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
     TTF_FONT* font = NULL;
-    extract_font_from_file("nobuntu.ttf", &font);
+    extract_font_from_file("comic.ttf", &font);
 
     printf("Font data loaded at 0x%x", font);
 
@@ -54,11 +54,10 @@ void cr_set_pixel(cairo_t* cr, uint16_t x, uint16_t y) {
 void draw_glyf(cairo_t* cr, GLYF_PIXBUF* pixbuf, uint16_t x, uint16_t y) {
     for (uint16_t r = 0; r < pixbuf->h; r++) {
         for (uint16_t c = 0; c < pixbuf->w; c++) {
-            if (pixbuf->buf[r * pixbuf->w + c] == 0xff) {
-                cairo_rectangle (cr, c + x, r + y, 1, 1);
-                cairo_set_source_rgb (cr, 0, 0, 0);  // green
-                cairo_fill (cr);
-            }
+            uint8_t bri = 255 - pixbuf->buf[r * pixbuf->w + c];
+            cairo_rectangle (cr, c + x, r + y, 1, 1);
+            cairo_set_source_rgb (cr, bri / 255.f, bri / 255.f, bri / 255.f);  // green
+            cairo_fill (cr);
         }
     }
 }
@@ -90,24 +89,24 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
     cairo_set_line_width(cr, 1);
 
     if (drawed == 0) {
-//        drawed = 1;
+        drawed = 1;
         ttf_log("Found %d gyfs\n", font->glyfs_n);
         ttf_log("Loa35d glyfs at 0x%x\n", font->glyfs);
         uint8_t f = 19;
 
-        /*
-        TTF_GLYF* glyf = font->glyfs[19 + ('5' - '0')];36 + ('I' - 'A')*];
-        GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 7.0);
+        TTF_GLYF* glyf = font->glyfs[35];
+        GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 12.0);
         printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
         draw_glyf(cr, pixbuf, 20, 20);
-        */
+        
 
-        for (uint32_t g = f; g < f + 90; g++) {
+       for (uint32_t g = f; g < f + 80; g++) {
            TTF_GLYF* glyf = font->glyfs[g];
-            GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 10.0);
+           printf("GLYF #%d", g);
+            GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 30.0);
             if (pixbuf == NULL) continue;
             printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
-            draw_glyf(cr, pixbuf, 20 + ((g - f) * 55) % 700, 20 + ((g - f) / 15) * 100);
+            draw_glyf(cr, pixbuf, 20 + ((g - f) * 85) % 700, 20 + ((g - f) / 10) * 100);
         }
 
     }

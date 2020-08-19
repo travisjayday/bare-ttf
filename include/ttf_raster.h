@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "ttf_tables.h"
+#include "ttf_utils.h"
 
 typedef struct {
     float x0, y0, x1, y1;
@@ -15,6 +16,10 @@ typedef struct {
     uint8_t hor;
     uint8_t ver; 
 } _LINE;
+
+typedef struct {
+    float x, y;
+} _POINT;
 
 typedef struct {
     uint8_t* buf;

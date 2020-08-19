@@ -67,3 +67,15 @@ void ttf_log(const char *format, ...)
 
     va_end(args);
 }
+
+void ttf_log_r(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+#ifdef VERBOSE
+    vprintf(format, args);
+#endif
+
+    va_end(args);
+}
