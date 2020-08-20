@@ -256,6 +256,8 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
 
     pixbuf->w = (float) (x_max - x_min + 1) + 0.5f;
     pixbuf->h = (float) (y_max - y_min + 1) + 0.5f;
+
+    pixbuf->shift_y = -glyf->y_min / scale_f - pixbuf->h;
  
 
     pixbuf->buf = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
@@ -385,7 +387,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
             p->y = lines[i]->y1;
             blacklist[blacklist_n++] = p;
             //lines[li]->y1 -= .3333;
-            printf("BLACKLISTING POINT (%f, %f)", p->x, p->y);
+            //printf("BLACKLISTING POINT (%f, %f)", p->x, p->y);
         }
 
         /*float cos_t = l_angle(li, lo);
@@ -459,8 +461,8 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
             for (uint16_t j = 0; j < blacklist_n; j++) {
                 if (fabs(y, blacklist[j]->y) < 0.0000001) {
                     if (fabs(x_i, blacklist[j]->x) < 0.1)  {
-                        printf("Blacked (%f, %f) %f/%d,%f", blacklist[j]->x, blacklist[j]->y, x_i, y, blacklist[j]->y);
-                    goto blacklisted;
+                        ttf_log_r("Blacked (%f, %f) %f/%d,%f", blacklist[j]->x, blacklist[j]->y, x_i, y, blacklist[j]->y);
+                        goto blacklisted;
                     }
                 }
                 if (fabs(y, blacklist[j]->y) < 0.05f) {
@@ -468,9 +470,8 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                              * (x_i - blacklist[j]->x);
                              /*+ (y - blacklist[j]->y) * 0.001
                              * (y - blacklist[j]->y);*/
-                    printf("considering to skip %f with d: %f\n", x_i, fabs(x_i, blacklist[j]->x));
                     if (fabs(x_i, blacklist[j]->x) < 0.2) {
-                        printf("SKIPPING %f because of (%f, %f) on y=%d\n",
+                        ttf_log_r("SKIPPING %f because of (%f, %f) on y=%d\n",
                             x_i, blacklist[j]->x, blacklist[j]->y, y);
                         goto blacklisted;
                     }
@@ -546,7 +547,6 @@ blacklisted:
             if (bri < 0xff && counting == 0 && bri_above > 30 && bri_below > 30) {
                 counting = 1;
                 last_start = c;
-                printf("START AT %d", c);
             }
             if (counting != 0 && (bri > 50 || bri_above < 10 || bri_below < 10)) {
                 if (c + 1 - last_start + 1 > 4) {

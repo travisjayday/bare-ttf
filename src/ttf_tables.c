@@ -49,6 +49,59 @@ TTF_TABLE_MAXP* read_table_maxp(uint8_t* loc) {
         table->max_comp_elms    = read_uint16(loc, &cur);
         table->max_comp_depth   = read_uint16(loc, &cur);
     }
+    else {
+        printf("DO NOT SUPPORT NON V1 MAXP");
+    }
+
+    return table;
+}
+
+TTF_TABLE_HHEA* read_table_hhea(uint8_t* loc) {
+    uint32_t cur = 0;
+    TTF_TABLE_HHEA* table = calloc(1, sizeof(TTF_TABLE_HHEA));
+
+    table->major_v      = read_uint16(loc, &cur);
+    table->minor_v      = read_uint16(loc, &cur);
+    table->ascender     = read_int16(loc, &cur);
+    table->descender    = read_int16(loc, &cur);
+    table->line_gap     = read_int16(loc, &cur);
+    table->max_adv_w    = read_uint16(loc, &cur);
+    table->min_lsb      = read_int16(loc, &cur);
+    table->min_rsb      = read_int16(loc, &cur);
+    table->max_x_ext    = read_int16(loc, &cur);
+    table->caret_slopri = read_int16(loc, &cur);
+    table->caret_slopru = read_int16(loc, &cur);
+    table->caret_offset = read_int16(loc, &cur);
+    table->res12        = read_uint32(loc, &cur);
+    table->res34        = read_uint32(loc, &cur);
+    table->fmt_metric_d = read_int16(loc, &cur);
+    table->hmetrics_n   = read_uint16(loc, &cur);
+
+    return table;
+}
+
+TTF_TABLE_HMTX* read_table_hmtx(uint8_t* loc, uint16_t glyfs_n, uint16_t hmetrics_n) {
+    uint32_t cur = 0;
+    TTF_TABLE_HMTX* table = calloc(1, sizeof(TTF_TABLE_HMTX));
+
+    table->hmetrics = (_HMTX_RECORD**) malloc(
+            hmetrics_n * sizeof(_HMTX_RECORD*));
+    for (uint16_t i = 0; i < hmetrics_n; i++) {
+        _HMTX_RECORD* rec = malloc(sizeof(_HMTX_RECORD));
+        rec->advance_w = read_uint16(loc, &cur);
+        rec->lsb = read_int16(loc, &cur);
+        table->hmetrics[i] = rec;
+    }
+
+    uint16_t rem = glyfs_n - hmetrics_n;
+    if (rem > 0) {
+        table->rem_lsbs = (int16_t*) malloc(
+               rem * sizeof(int16_t)); 
+        for (uint16_t i = 0; i < rem; i++) 
+            table->rem_lsbs[i] = read_int16(loc, &cur); 
+    }
+    else 
+        table->rem_lsbs = NULL;
 
     return table;
 }
@@ -58,19 +111,29 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
     uint32_t cur = 0;
     TTF_TABLE_LOCA* table = calloc(1, sizeof(TTF_TABLE_LOCA));
 
-    uint32_t* offsets = (uint32_t*) malloc(glyfs_n * sizeof(uint32_t*));
+    table->glyf_offsets = (uint32_t*) malloc(glyfs_n * sizeof(uint32_t));
+    table->glyf_no_conts = (uint8_t*) calloc(glyfs_n, sizeof(uint8_t));
 
-    if (idx_to_loc_f == 1) 
+    if (idx_to_loc_f == 1) {
         // uses long offsets (Offset32)
-        for (uint32_t i = 0; i < glyfs_n; i++)
-            offsets[i] = read_uint32(loc, &cur);
-    else 
+        for (uint32_t i = 0; i < glyfs_n; i++) {
+            uint32_t d = read_uint32(loc, &cur);
+            if (i < glyfs_n - 1 && d == read_uint32(loc, &cur)) 
+                table->glyf_no_conts[i] = 0xff;
+            table->glyf_offsets[i] = d;
+            cur -= sizeof(uint32_t);
+        }
+    }
+    else {
         // uses short offsets (Offset16)
-        for (uint32_t i = 0; i < glyfs_n; i++)
-            offsets[i] = 2 * read_uint16(loc, &cur);
-
-    table->glyf_offsets = offsets;
-
+        for (uint32_t i = 0; i < glyfs_n; i++) {
+            uint32_t d = read_uint16(loc, &cur);
+            if (i < glyfs_n - 1 && d == read_uint16(loc, &cur)) 
+                table->glyf_no_conts[i] = 0xff;
+            table->glyf_offsets[i] = d;
+            cur -= sizeof(uint16_t);
+        }
+    }
     return table;
 }
 
@@ -96,7 +159,45 @@ TTF_TABLE_CMAP* read_table_cmap(uint8_t* loc) {
     return table;
 }
 
- 
+TTF_CMAP_FMT4* read_cmap4(uint8_t* loc) {
+    TTF_CMAP_FMT4* fmt = malloc(sizeof(TTF_CMAP_FMT4));
+    uint32_t cur = 0;
+    fmt->format         = read_uint16(loc, &cur);
+    fmt->len            = read_uint16(loc, &cur);
+    fmt->lan            = read_uint16(loc, &cur);
+    fmt->seg_n2         = read_uint16(loc, &cur);
+    fmt->search_rng     = read_uint16(loc, &cur);
+    fmt->entry_sel      = read_uint16(loc, &cur);
+    fmt->range_shift    = read_uint16(loc, &cur);
+
+    uint32_t seg_n      = fmt->seg_n2 / 2;
+
+    fmt->end_c = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    for (uint32_t i = 0; i < seg_n; i++) 
+        fmt->end_c[i] = read_uint16(loc, &cur);
+
+    fmt->reserved       = read_uint16(loc, &cur);
+
+    fmt->start_c = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    for (uint32_t i = 0; i < seg_n; i++) 
+        fmt->start_c[i] = read_uint16(loc, &cur);
+
+    fmt->id_delta = (int16_t*) malloc(seg_n * sizeof(int16_t));
+    for (uint32_t i = 0; i < seg_n; i++) 
+        fmt->id_delta[i] = read_int16(loc, &cur);
+
+    fmt->id_rng_offset = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    for (uint32_t i = 0; i < seg_n; i++) 
+        fmt->id_rng_offset[i] = read_uint16(loc, &cur);
+    
+    fmt->id_arr_n = fmt->len - cur;
+    fmt->id_arr = (uint16_t*) malloc(fmt->id_arr_n * sizeof(uint16_t)); 
+    for (uint16_t i = 0; i < fmt->id_arr_n; i++) {
+        fmt->id_arr[i] = read_uint16(loc, &cur);
+    }
+
+    return fmt;
+}
 
 TTF_GLYF* read_glyf(uint8_t* loc) {
     uint32_t cur = 0;
@@ -151,7 +252,7 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
     // read contour endpoint indices and find max idx
     gdata->cont_endpts = (uint16_t*) malloc(
             header->cont_n * sizeof(uint16_t));
-    uint16_t max_idx = 0;
+    uint32_t max_idx = 0;
     for (uint16_t i = 0; i < header->cont_n; i++) {
         gdata->cont_endpts[i] = read_uint16(loc, &cur); 
         if (gdata->cont_endpts[i] > max_idx)
@@ -159,6 +260,9 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
     }
     gdata->cont_n = header->cont_n;
     gdata->coords_n = max_idx + 1;
+
+    printf("%d COORD_NX. cont_n%d, ", gdata->coords_n, header->cont_n);
+    fflush(stdout);
 
     // read bytecode instructions
     gdata->instr_n = read_uint16(loc, &cur);
@@ -170,7 +274,7 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
             gdata->instr[i] = read_uint8(loc, &cur);
     }
     
-    gdata->flags = (uint8_t*) malloc(gdata->coords_n * sizeof(uint8_t));
+    gdata->flags = (uint8_t*) malloc((gdata->coords_n) * sizeof(uint8_t));
 
     // populate flags 
     for (uint16_t i = 0; i < gdata->coords_n; ) {

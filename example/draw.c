@@ -26,7 +26,7 @@ gint main (gint argc, gchar **argv) {
     gtk_widget_set_size_request (canvas, DEFAULT_WIDTH, DEFAULT_HEIGHT);
 
     TTF_FONT* font = NULL;
-    extract_font_from_file("ubuntu.ttf", &font);
+    extract_font_from_file(argv[1], &font);
 
     printf("Font data loaded at 0x%x", font);
 
@@ -43,7 +43,7 @@ gint main (gint argc, gchar **argv) {
     return 0;
 }
 
-uint8_t drawed = 1;
+uint8_t drawed = 0;
 
 void cr_set_pixel(cairo_t* cr, uint16_t x, uint16_t y) {
     cairo_rectangle (cr, x, y, 1, 1);
@@ -83,6 +83,7 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
 
     TTF_FONT* font = (TTF_FONT*) data;
     printf("Font data loaded at 0x%x", font);
+    printf("pixels per em: %d\n", font->head->units_per_em);
     fflush(stdout);
 
     cairo_set_source_rgb(cr, 0.42, 0.65, 0.80);
@@ -94,19 +95,41 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
         ttf_log("Loa35d glyfs at 0x%x\n", font->glyfs);
         uint8_t f = 19;
 
-        TTF_GLYF* glyf = font->glyfs[19 + 9];
-        GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 10);
-        printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
-        draw_glyf(cr, pixbuf, 20, 20);
+        char* str = "Hello, world!";
+
+        uint32_t x = 20;
+        for (uint8_t i = 0; i < strlen(str); i++) {
+            TTF_GLYF* glyf = glyf_from_char(font, str[i]); 
+            GLYF_PIXBUF* pixbuf = NULL;
+            if (glyf->cont_n != 0) {
+                pixbuf = rasterize_glyf(glyf, font->head->units_per_em / 65.f);
+            }
+            else 
+                printf("Skipping char");
+
+            uint16_t rsb = glyf->rsb / (font->head->units_per_em / 65.f) + 0.5f;
+            uint16_t lsb = glyf->lsb / (font->head->units_per_em / 65.f) + 0.5f;
+
+            x += lsb;
+
+            if (glyf->cont_n != 0) {
+                draw_glyf(cr, pixbuf, x, 100 + pixbuf->shift_y);
+                printf("%c -> y:[%d, %d] -> v_shift: %d, bearings: [%d, %d]\n", 
+                    str[i], glyf->y_min, glyf->y_max, pixbuf->shift_y, glyf->lsb, rsb);
+                x += pixbuf->w;
+            }
+
+            x += rsb;
+        }
         
-       for (uint32_t g = f; g < f + 80; g++) {
+       /*for (uint32_t g = f; g < f + 80; g++) {
            TTF_GLYF* glyf = font->glyfs[g];
            printf("GLYF #%d", g);
             GLYF_PIXBUF* pixbuf = rasterize_glyf(glyf, 30.0);
             if (pixbuf == NULL) continue;
             printf("Rasterized glyf size %d x %d", pixbuf->w, pixbuf->h);
             draw_glyf(cr, pixbuf, 20 + ((g - f) * 85) % 700, 20 + ((g - f) / 10) * 100);
-        }
+        }*/
 
     }
 

@@ -7,7 +7,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define VERBOSE
+//#define VERBOSE
 
 int16_t read_int16(uint8_t* base, uint32_t* cursor);
 

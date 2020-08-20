@@ -25,6 +25,7 @@ typedef struct {
     uint8_t* buf;
     uint16_t w;
     uint16_t h;
+    int16_t shift_y;
 } GLYF_PIXBUF;
 
 void set_pixel(GLYF_PIXBUF* buf, float x, float y);
