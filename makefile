@@ -6,7 +6,7 @@ SRC = ttf_utils.c ttf_tables.c ttf_reader.c ttf_raster.c
 OBJ = $(patsubst %.c, $(build_path)/%.o, $(SRC))
 
 default: clean lib 
-	./a.out ubuntu.ttf
+	./a.out nobuntu.ttf
 
 lib: $(OBJ) 
 	ar -rc $(build_path)/libttf.a $^
@@ -19,7 +19,7 @@ example: clean lib
 	ls ./build
 	$(CC) $(CFLAGS) ./example/draw.c $(build_path)/libttf.a `pkg-config --libs --cflags cairo` \
 			`pkg-config --cflags --libs gtk+-2.0` \
-		-o a.out && ./a.out comic.ttf
+		-o a.out && ./a.out nobuntu.ttf
 
 
 clean: 

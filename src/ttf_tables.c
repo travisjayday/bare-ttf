@@ -130,7 +130,7 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
             uint32_t d = read_uint16(loc, &cur);
             if (i < glyfs_n - 1 && d == read_uint16(loc, &cur)) 
                 table->glyf_no_conts[i] = 0xff;
-            table->glyf_offsets[i] = d;
+            table->glyf_offsets[i] = 2 * d;
             cur -= sizeof(uint16_t);
         }
     }
