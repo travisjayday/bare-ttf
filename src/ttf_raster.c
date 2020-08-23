@@ -1,5 +1,18 @@
 #include "ttf_raster.h"
 
+/* private structs used for rasterizing */
+typedef struct {
+    float x0, y0, x1, y1;
+    float m;
+    float b;
+    uint8_t hor;
+    uint8_t ver; 
+} _LINE;
+
+typedef struct {
+    float x, y;
+} _POINT;
+
 #define add_line(_x0, _y0, _x1, _y1) \
         _LINE* l = (_LINE*) malloc(sizeof(_LINE)); \
         l->x0 = _x0; \
@@ -8,7 +21,7 @@
         l->y1 = _y1; \
         if (_x1 - _x0 == 0) l->ver = 1; \
         else l->ver = 0; \
-        if (fabs(_y1, _y0) <= 0.2) l->hor = 1; \
+        if (absdiff(_y1, _y0) <= 0.2) l->hor = 1; \
         else l->hor = 0; \
         l->m = (_y1 - _y0) / (_x1 - _x0); \
         lines[line_n++] = l;
@@ -28,55 +41,15 @@
         _ctx_x = Bx; \
         _ctx_y = By; \
     }
-        
 
-uint16_t pixbuf_w;
-uint16_t pixbuf_h;
-int16_t x_min;
-int16_t y_min;
-
-void set_pixel(GLYF_PIXBUF* px, float x, float y) {
-    px->buf[(uint32_t)(y * px->w + x + 0.5f)] = 0xff;
-}
-
-void q_bezier_curve(GLYF_PIXBUF* px,
-        float x0, float y0, /* the initial point */
-        float x1, float y1, /* the control point */
-        float x2, float y2) /* the final   point */
-{
-    float t = 0.f;
-    float Bx = 0.f;
-    float By = 0.f;
-    while (t <= 1.0f) {
-        Bx = x1 + (1.f - t) * (1.f - t) * (x0 - x1) + t * t * (x2 - x1);
-        By = y1 + (1.f - t) * (1.f - t) * (y0 - y1) + t * t * (y2 - y1);
-        set_pixel(px, Bx, By);
-        t += 0.005f;
-    }
-    ttf_log_r("\nbezier_to: (%f, %f) -- [%f, %f] --> (%f, %f)\n", x0, y0, x1, y1, x2, y2);
-}
-
-void line_to(GLYF_PIXBUF* px, 
-        float x0, float y0, 
-        float x1, float y1) {
-    float t = 0.f;
-    float Bx = 0.f;
-    float By = 0.f;
-    while (t <= 1.0f) {
-        Bx = (1.f - t) * x0 + t * x1;
-        By = (1.f - t) * y0 + t * y1;
-        set_pixel(px, Bx, By);
-        t += 0.005f;
-    }
-    ttf_log_r("\nline_to: (%f, %f) --> (%f, %f)\n", x0, y0, x1, y1);
-}
-
-float fabs(float f1, float f2) {
+// ret absolute difference 
+float absdiff(float f1, float f2) {
     if (f1 > f2) return f1 - f2;
     else return f2 - f1;
 }
 
 
+// sort ascending
 void sort(float* arr, uint16_t n)
 {
     uint16_t i, j;
@@ -88,6 +61,12 @@ void sort(float* arr, uint16_t n)
                 arr[j] = arr[j + 1];
                 arr[j + 1] = tmp;
             }
+}
+
+
+void free_pixbuf(GLYF_PIXBUF* px) {
+    free(px->buf);
+    free(px);
 }
 
 
@@ -103,45 +82,6 @@ void printbuf(GLYF_PIXBUF* px) {
     } 
 }
 
-
-float _sqrt(float x)
-{
-    float guess = 1;
-    while (fabs((guess * guess) / x - 1.0, 0.0f) >= 0.005)
-        guess = ((x / guess) + guess) / 2.f;
-    return guess;
-}
-
-float l_angle(_LINE* l_i, _LINE* l_o) {
-
-    // These lines intersect at END(l_i) or START(l_o)
-
-    /*printf("Line IN((%.2f, %.2f), (%.2f, %.2f))\n", 
-                l_i->x0, l_i->y0, l_i->x1, l_i->y1); 
-    printf("Line OUT((%.2f, %.2f), (%.2f, %.2f))\n", 
-                l_o->x0, l_o->y0, l_o->x1, l_o->y1); */
-
-
-    // v = Rev(Dir(line_in))
-    // where line_in := (l_i->x0, l_i->y0) --> (l_i->x1, l_i->y1)
-    float v_x = l_i->x0 - l_i->x1;
-    float v_y = l_i->y0 - l_i->y1; 
-
-    // u = Dir(line_out)
-    // where line_out := (l_o->x0, l_o->y0) --> (l_o->x1, l_o->y1)
-    float u_x = l_o->x1 - l_o->x0;
-    float u_y = l_o->y1 - l_o->y0;
-
-    // to test whether these lines intersect sharply, find
-    // the angle between them, so (u*v)/(mag(u) * mag(v))
-    float u_d_v = (u_x * v_x) + (u_y * v_y);
-    float mag_u = _sqrt(u_x * u_x + u_y * u_y);
-    float mag_v = _sqrt(v_x * v_x + v_y * v_y);
-    float cos_t = u_d_v / (mag_u * mag_v);  
-
-    return cos_t;
-}
-
 void plot(GLYF_PIXBUF* px, uint32_t x, uint32_t y, float c) {
     if (y * px->w + x > px->w * px->h - 1) return;
     uint16_t bri = px->buf[y * px->w + x] + (uint8_t) (c * 255); 
@@ -149,12 +89,15 @@ void plot(GLYF_PIXBUF* px, uint32_t x, uint32_t y, float c) {
     else px->buf[y * px->w + x] = bri;
 }
 
+/* The following functions are used in Wu's Anti-Aliased line 
+   drawing algorithm */ 
+
 // integer part of x
 uint32_t ipart(float x) {
     return (uint32_t) x;
 }
 
-uint32_t round(float x) {
+uint32_t _round(float x) {
     return ipart(x + 0.5);
 }
 
@@ -168,7 +111,7 @@ float rfpart(float x) {
 }
 
 void draw_line(GLYF_PIXBUF* px, float x0, float y0, float x1, float y1) {
-    uint8_t steep = fabs(y1, y0) > fabs(x1, x0)? 1 : 0;
+    uint8_t steep = absdiff(y1, y0) > absdiff(x1, x0)? 1 : 0;
 
     float t = x0;
     if (steep) {
@@ -194,7 +137,7 @@ void draw_line(GLYF_PIXBUF* px, float x0, float y0, float x1, float y1) {
         gradient = 1.0;
 
     // handle first endpoint
-    float xend = round(x0);
+    float xend = _round(x0);
     float yend = y0 + gradient * (xend - x0);
     float xgap = rfpart(x0 + 0.5);
     float xpxl1 = xend; // this will be used in the main loop
@@ -210,7 +153,7 @@ void draw_line(GLYF_PIXBUF* px, float x0, float y0, float x1, float y1) {
     float intery = yend + gradient; // first y-intersection for the main loop
 
     // handle second endpoint
-    xend = round(x1);
+    xend = _round(x1);
     yend = y1 + gradient * (xend - x1);
     xgap = fpart(x1 + 0.5);
     float xpxl2 = xend; //this will be used in the main loop
@@ -240,27 +183,26 @@ void draw_line(GLYF_PIXBUF* px, float x0, float y0, float x1, float y1) {
         }
     }
 }
+/* **** */ 
 
+// main rasterization function 
 GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
 
     if (glyf->cont_n <= 0) return NULL; 
 
     float offset_x = -glyf->x_min;
     float offset_y = -glyf->y_min;
-
-    GLYF_PIXBUF* pixbuf = (GLYF_PIXBUF*) malloc(sizeof(GLYF_PIXBUF));
-    x_min = glyf->x_min / scale_f;
-    y_min = glyf->y_min / scale_f;
+    int16_t x_min = glyf->x_min / scale_f;
+    int16_t y_min = glyf->y_min / scale_f;
     int16_t x_max = (float) glyf->x_max / scale_f + 0.5f;
     int16_t y_max = (float) glyf->y_max / scale_f + 0.5f;
 
+    GLYF_PIXBUF* pixbuf = (GLYF_PIXBUF*) malloc(sizeof(GLYF_PIXBUF));
     pixbuf->w = (float) (x_max - x_min + 1) + 0.5f;
     pixbuf->h = (float) (y_max - y_min + 1) + 0.5f;
-
     pixbuf->shift_y = -glyf->y_min / scale_f - pixbuf->h;
- 
-
     pixbuf->buf = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
+    pixbuf->free = &free_pixbuf;
 
     ttf_log_r("cont_n: %d\n; x: [%d, %d], y: [%d, %d]\n", glyf->cont_n, 
         glyf->x_min, glyf->x_max, glyf->y_min, glyf->y_max);
@@ -320,7 +262,6 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
             // finish bezier curve
             if (gdata->flags[i] & F_ON_CURVE_POINT) {
                 //add_line(ctx_x, ctx_y, x, y);
-                // q_bezier_curve(pixbuf, ctx_x, ctx_y, x0, y0, x, y);
                 add_curve(ctx_x, ctx_y, x0, y0, x, y);
                 ctx_x = x;
                 ctx_y = y;
@@ -330,11 +271,6 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
             else {
                 //add_line(ctx_x, ctx_y, (x0 + x) / 2.f, (y0 + y) / 2.f);
                 add_curve(ctx_x, ctx_y, x0, y0, (x0 + x) / 2.f, (y0 + y) / 2.f);
-                /*q_bezier_curve( 
-                        pixbuf,
-                        ctx_x, ctx_y,
-                        x0, y0, 
-                        (x0 + x) / 2.f, (y0 + y) / 2.f);*/
                 ctx_x = (x0 + x) / 2.f; 
                 ctx_y = (y0 + y) / 2.f; 
             }
@@ -348,31 +284,24 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                 // finish bezier curve
                 if (gdata->flags[start_c] & F_ON_CURVE_POINT) {
                     add_line(ctx_x, ctx_y, x0, y0);
-                    // q_bezier_curve(pixbuf, ctx_x, ctx_y, x, y, x0, y0);
                 }
-                // chain bezier curve
+                // chain bezier curve to finish
                 else {
                     //add_line(ctx_x, ctx_y, (x0 + x) / 2.f, (y0 + y) / 2.f);
-                    
-             
-                    /* q_bezier_curve(
-                            pixbuf,
-                            ctx_x, ctx_y, 
-                            x, y, 
-                            (x + x0) / 2.f, (y + y0) / 2.f);*/
+                    add_curve(ctx_x, ctx_y, x, y, (x0 + x) / 2.f, (y0 + y) / 2.f);
                 }
             }
             else {
                 // finish with line to start
                 add_line(x, y, x0, y0);
-                //line_to(pixbuf, x, y, x0, y0);
             }
             start_c = i + 1;
             state = 0;
         }
     }
-
     
+    // points in blacklist are not allowed to be valid x intercepts for 
+    // scanline rasterization
     _POINT** blacklist = (_POINT**) malloc((line_n + 1) * sizeof(_POINT*));
     uint16_t blacklist_n = 0;
     for (uint16_t i = 0; i < line_n; i++) {
@@ -380,28 +309,19 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
         _LINE* lo = lines[(i + 1) % line_n];
         
         if (li->hor || lo->hor) continue;
+
+        // add singular vertices at ^ or v
         if ((li->y0 <= li->y1 && lo->y1 <= li->y1) 
             || (li->y0 >= li->y1 && lo->y1 >= li->y1)) {
             _POINT* p = malloc(sizeof(_POINT));
             p->x = lines[i]->x1;
             p->y = lines[i]->y1;
             blacklist[blacklist_n++] = p;
-            //lines[li]->y1 -= .3333;
-            //printf("BLACKLISTING POINT (%f, %f)", p->x, p->y);
         }
-
-        /*float cos_t = l_angle(li, lo);
-        if (cos_t < 1.5707f && cos_t > 0) {
-            _POINT* p = malloc(sizeof(_POINT));
-            p->x = li->x1;
-            p->y = li->y1;
-            blacklist[blacklist_n++] = p;
-            printf("POINT (%f, %f) is ACCUTE\n", p->x, p->y);
-        }                                       */
     }
 
+    // Find x-intercepts between lines
     ttf_log_r("colected %d lines\n", line_n);
-    fflush(stdout);
     for (uint16_t y = 0; y < pixbuf->h; y++) {
         float* x_ints = (float*) malloc((pixbuf->w) * sizeof(float));
         uint16_t x_ints_n = 0;
@@ -416,10 +336,10 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                 l->m = (l->y1 - l->y0) / (l->x1 - l->x0);
                 ttf_log_r("simuating over [%f, %f] with m=%f\n", x_start, x_end, l->m);
                 if (x_end - x_start < 0.005) continue;
-                for (float x = x_start - 0.01; x < x_end; x += 0.005f / fabs(l->m, 0)) {
+                for (float x = x_start - 0.01; x < x_end; x += 0.005f / absdiff(l->m, 0)) {
                     float y_calc = l->m * (x - l->x0) + l->y0; 
-                    //ttf_log_r("%.1f/%.1f ", y_calc, fabs(y_calc, y) );
-                    if (fabs(y_calc, y) <= 0.0075f) {
+                    //ttf_log_r("%.1f/%.1f ", y_calc, absdiff(y_calc, y) );
+                    if (absdiff(y_calc, y) <= 0.0075f) {
                         x_ints[x_ints_n++] = x;
                         ttf_log_r("x_int: %f", x);
                         break;
@@ -437,7 +357,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                 //ttf_log_r("vline at x=%f\n", x_ints[0]);
                 }
             }
-            if (l->hor && fabs(l->y0, y) < 0.5f) {
+            if (l->hor && absdiff(l->y0, y) < 0.5f) {
                 ttf_log_r("hline at y=%d from [%f, %f]\n", y, l->x0, l->x1);
                 float x_start = l->x0 < l->x1? l->x0 : l->x1;
                 float x_end = l->x0 < l->x1? l->x1 : l->x0;
@@ -448,55 +368,51 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                 continue;
             }
         }
+        // sort x intercepts to be paried in order
         sort(x_ints, x_ints_n);
         ttf_log_r("intercepts for y=%d: ", y);
 
-        float* filtered_x = (float*) malloc((pixbuf->w) * sizeof(float));
+        float dinc = 0.1f;
+        do {
+            float* filtered_x = (float*) malloc((pixbuf->w) * sizeof(float));
+            uint16_t m = 0;
 
-        uint16_t m = 0;
-        for (uint16_t i = 0; i < x_ints_n; i++) {
-            
-            // filter out accute vertices (blacklisted)
-            float x_i = x_ints[i];
-            for (uint16_t j = 0; j < blacklist_n; j++) {
-                if (fabs(y, blacklist[j]->y) < 0.0000001) {
-                    if (fabs(x_i, blacklist[j]->x) < 0.1)  {
-                        ttf_log_r("Blacked (%f, %f) %f/%d,%f", blacklist[j]->x, blacklist[j]->y, x_i, y, blacklist[j]->y);
-                        goto blacklisted;
+            for (uint16_t i = 0; i < x_ints_n; i++) {
+                // filter out blacklisted vertices
+                float x_i = x_ints[i];
+                for (uint16_t j = 0; j < blacklist_n; j++) {
+                    if (absdiff(y, blacklist[j]->y) < (0.05f + dinc)) {
+                        float d2 = (x_i - blacklist[j]->x) 
+                                 * (x_i - blacklist[j]->x);
+                                 /*+ (y - blacklist[j]->y) * 0.001
+                                 * (y - blacklist[j]->y);*/
+                        if (absdiff(x_i, blacklist[j]->x) < (0.2f + dinc)) {
+                            ttf_log_r("SKIPPING %f because of (%f, %f) on y=%d\n",
+                                x_i, blacklist[j]->x, blacklist[j]->y, y);
+                            goto blacklisted;
+                        }
                     }
                 }
-                if (fabs(y, blacklist[j]->y) < 0.05f) {
-                    float d2 = (x_i - blacklist[j]->x) 
-                             * (x_i - blacklist[j]->x);
-                             /*+ (y - blacklist[j]->y) * 0.001
-                             * (y - blacklist[j]->y);*/
-                    if (fabs(x_i, blacklist[j]->x) < 0.2) {
-                        ttf_log_r("SKIPPING %f because of (%f, %f) on y=%d\n",
-                            x_i, blacklist[j]->x, blacklist[j]->y, y);
-                        goto blacklisted;
-                    }
-                }
-            }
 
-            // filter out points that are very close to each other
-            float d = fabs(x_ints[i], x_ints[i + 1]);
-            if (fabs(x_ints[i], x_ints[i + 1]) < 0.5 / scale_f) continue;
-            else
-                filtered_x[m++] = x_ints[i];
+                if (i + 1 < x_ints_n 
+                    && absdiff(x_ints[i], x_ints[i + 1]) < ((0.5f + dinc)  / scale_f))
+                        continue;
+                else
+                    filtered_x[m++] = x_ints[i];
 blacklisted:
-            0 == 0;
-        }
+                0 == 0;
+            }
+            free(x_ints);
+            x_ints = filtered_x;
+            x_ints_n = m;
+            dinc += 0.1f;
+        } while (x_ints_n % 2 != 0 && dinc < 10.f);
 
-        x_ints = filtered_x;
-        x_ints_n = m;
+        if (x_ints_n % 2 != 0) printf("GAVE UP");
+
+        // scanline color between consecutive x intercepts
         for (uint16_t i = 0; i < x_ints_n; i += 2) {
-            if (i - 1 < x_ints_n) {
-                /*if (fabs(x_ints[i], x_ints[i + 1]) < 0.1f) { 
-                    ttf_log_r("SKIPPING CLOSE PointS: %f, %f", 
-                            x_ints[i], x_ints[i + 1]);
-                    i--;
-                    continue;
-                }*/
+            if (i + 1 < x_ints_n) {
                 ttf_log_r("COLOR x=[%f, %f], ", x_ints[i], x_ints[i + 1]);
                 uint16_t x_start = x_ints[i];
                 uint16_t x_end = x_ints[i + 1];
@@ -508,6 +424,7 @@ blacklisted:
         ttf_log_r("\n");
     }
 
+    // do anti-aliasing by drawing anti-aliased outlines
     for (uint16_t i = 0; i < line_n; i++) {
         _LINE* l = lines[i];
         draw_line(pixbuf, l->x0, l->y0, l->x1, l->y1);
@@ -537,6 +454,7 @@ blacklisted:
         ttf_log_r("\n|");
     } 
 
+    // filter out white single pixel lines 
     last_start = 0;
     counting = 0;
     for (uint16_t r = 1; r < pixbuf->h - 1; r++) {
@@ -562,8 +480,8 @@ blacklisted:
     } 
  
 
+    // reflect the shape vertically 
     uint8_t* ref = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
-
     for (uint16_t r = 0; r < pixbuf->h; r++) {
         for (uint16_t c = 0; c < pixbuf->w; c++) {
             ref[(pixbuf->h - r - 1) * pixbuf->w + c] = pixbuf->buf[r * pixbuf->w + c];
@@ -572,12 +490,18 @@ blacklisted:
     }
     ttf_log_r("----------------");
 
+    free(pixbuf->buf);
     pixbuf->buf = ref;
 
+    // print glyfph
     printbuf(pixbuf);
 
-    ttf_log_r("fins");
-    fflush(stdout);
+    for (uint16_t i = 0; i < blacklist_n; i++) free(blacklist[i]);
+    free(blacklist);
 
+    for (uint16_t i = 0; i < line_n; i++) free(lines[i]);
+    free(lines);
+
+    // return glyf pixel buffer
     return pixbuf;
 }

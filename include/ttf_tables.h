@@ -1,10 +1,7 @@
 #ifndef TTF_TABLES_H
 #define TTF_TABLES_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
+#include "ttf_libc.h"
 
 // Glyf flag bitmasks 
 #define F_ON_CURVE_POINT 0x01
@@ -109,7 +106,7 @@ it points to a TTF_SIMP_GLYPH */
     void* data;
 } TTF_GLYF;
 
-typedef struct {
+typedef struct TTF_GLYF_SIMP_D {
     uint16_t cont_n;
     uint16_t* cont_endpts;
     uint16_t instr_n;
@@ -119,6 +116,7 @@ typedef struct {
     uint16_t coords_n;
     int16_t* x_coords; 
     int16_t* y_coords; 
+    void (*free)(struct TTF_GLYF_SIMP_D*);
 } TTF_GLYF_SIMP_D;
 
 typedef struct {
@@ -139,22 +137,24 @@ typedef struct {
     uint16_t search_rng;
     uint16_t entry_sel;
     uint16_t range_shift;
-    uint16_t* end_c;
+    uint16_t* end_c;        // size seg_n
     uint16_t reserved;
-    uint16_t* start_c;
-    int16_t* id_delta;
-    uint16_t* id_rng_offset;
+    uint16_t* start_c;      // size seg_n
+    int16_t* id_delta;      // size seg_n
+    uint16_t* id_rng_offset;// size seg_n
     uint16_t  id_arr_n; 
     uint16_t* id_arr;
 } TTF_CMAP_FMT4;
 
-typedef struct {
+typedef struct TTF_TABLE_CMAP {
     uint16_t version;
     uint16_t encs_n;
     TTF_ENCODING_RECORD** encs; 
     uint8_t format;
-    // void* depends on format. if format == 4, encoding points to the first TTF_CMAP_FMT4 struct
+    // void* depends on format. 
+    // if format == 4, encoding points to the first TTF_CMAP_FMT4 struct
     void* encoding; 
+    void (*free)(struct TTF_TABLE_CMAP*);
 } TTF_TABLE_CMAP;
  
 

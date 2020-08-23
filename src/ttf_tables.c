@@ -3,7 +3,7 @@
 
 TTF_TABLE_HEAD* read_table_head(uint8_t* loc) {
    uint32_t cur = 0; 
-   TTF_TABLE_HEAD* table = malloc(sizeof(TTF_TABLE_HEAD));
+   TTF_TABLE_HEAD* table = ttf_malloc(sizeof(TTF_TABLE_HEAD));
 
    table->major_v               = read_uint16(loc, &cur);
    table->minor_v               = read_uint16(loc, &cur);
@@ -29,7 +29,7 @@ TTF_TABLE_HEAD* read_table_head(uint8_t* loc) {
 
 TTF_TABLE_MAXP* read_table_maxp(uint8_t* loc) {
     uint32_t cur = 0;
-    TTF_TABLE_MAXP* table = calloc(1, sizeof(TTF_TABLE_MAXP));
+    TTF_TABLE_MAXP* table = ttf_malloc(sizeof(TTF_TABLE_MAXP));
 
     table->version              = read_uint32(loc, &cur);
     table->glyfs_n              = read_uint16(loc, &cur);
@@ -50,7 +50,9 @@ TTF_TABLE_MAXP* read_table_maxp(uint8_t* loc) {
         table->max_comp_depth   = read_uint16(loc, &cur);
     }
     else {
-        printf("DO NOT SUPPORT NON V1 MAXP");
+        ttf_error("Only support MAXP Table version 1.0.\n");
+        ttf_error("Exiting...\n");
+        return NULL;
     }
 
     return table;
@@ -58,7 +60,7 @@ TTF_TABLE_MAXP* read_table_maxp(uint8_t* loc) {
 
 TTF_TABLE_HHEA* read_table_hhea(uint8_t* loc) {
     uint32_t cur = 0;
-    TTF_TABLE_HHEA* table = calloc(1, sizeof(TTF_TABLE_HHEA));
+    TTF_TABLE_HHEA* table = ttf_malloc(sizeof(TTF_TABLE_HHEA));
 
     table->major_v      = read_uint16(loc, &cur);
     table->minor_v      = read_uint16(loc, &cur);
@@ -82,20 +84,21 @@ TTF_TABLE_HHEA* read_table_hhea(uint8_t* loc) {
 
 TTF_TABLE_HMTX* read_table_hmtx(uint8_t* loc, uint16_t glyfs_n, uint16_t hmetrics_n) {
     uint32_t cur = 0;
-    TTF_TABLE_HMTX* table = calloc(1, sizeof(TTF_TABLE_HMTX));
+    TTF_TABLE_HMTX* table = ttf_malloc(sizeof(TTF_TABLE_HMTX));
 
-    table->hmetrics = (_HMTX_RECORD**) malloc(
+    table->hmetrics = (_HMTX_RECORD**) ttf_malloc(
             hmetrics_n * sizeof(_HMTX_RECORD*));
+
     for (uint16_t i = 0; i < hmetrics_n; i++) {
-        _HMTX_RECORD* rec = malloc(sizeof(_HMTX_RECORD));
+        _HMTX_RECORD* rec = ttf_malloc(sizeof(_HMTX_RECORD));
         rec->advance_w = read_uint16(loc, &cur);
         rec->lsb = read_int16(loc, &cur);
         table->hmetrics[i] = rec;
     }
 
-    uint16_t rem = glyfs_n - hmetrics_n;
+    int16_t rem = glyfs_n - hmetrics_n;
     if (rem > 0) {
-        table->rem_lsbs = (int16_t*) malloc(
+        table->rem_lsbs = (int16_t*) ttf_malloc(
                rem * sizeof(int16_t)); 
         for (uint16_t i = 0; i < rem; i++) 
             table->rem_lsbs[i] = read_int16(loc, &cur); 
@@ -109,10 +112,10 @@ TTF_TABLE_HMTX* read_table_hmtx(uint8_t* loc, uint16_t glyfs_n, uint16_t hmetric
 TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n, 
         uint8_t idx_to_loc_f) {
     uint32_t cur = 0;
-    TTF_TABLE_LOCA* table = calloc(1, sizeof(TTF_TABLE_LOCA));
+    TTF_TABLE_LOCA* table = ttf_malloc(sizeof(TTF_TABLE_LOCA));
 
-    table->glyf_offsets = (uint32_t*) malloc(glyfs_n * sizeof(uint32_t));
-    table->glyf_no_conts = (uint8_t*) calloc(glyfs_n, sizeof(uint8_t));
+    table->glyf_offsets = (uint32_t*) ttf_malloc(glyfs_n * sizeof(uint32_t));
+    table->glyf_no_conts = (uint8_t*) ttf_malloc(glyfs_n * sizeof(uint8_t));
 
     if (idx_to_loc_f == 1) {
         // uses long offsets (Offset32)
@@ -120,6 +123,8 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
             uint32_t d = read_uint32(loc, &cur);
             if (i < glyfs_n - 1 && d == read_uint32(loc, &cur)) 
                 table->glyf_no_conts[i] = 0xff;
+            else 
+                table->glyf_no_conts[i] = 0x0;
             table->glyf_offsets[i] = d;
             cur -= sizeof(uint32_t);
         }
@@ -130,6 +135,8 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
             uint32_t d = read_uint16(loc, &cur);
             if (i < glyfs_n - 1 && d == read_uint16(loc, &cur)) 
                 table->glyf_no_conts[i] = 0xff;
+            else 
+                table->glyf_no_conts[i] = 0x0;
             table->glyf_offsets[i] = 2 * d;
             cur -= sizeof(uint16_t);
         }
@@ -137,30 +144,38 @@ TTF_TABLE_LOCA* read_table_loca(uint8_t* loc, uint32_t glyfs_n,
     return table;
 }
 
+void free_table_cmap(TTF_TABLE_CMAP* table) {
+    for (uint16_t i = 0; i < table->encs_n; i++)
+        ttf_free(table->encs[i]);
+    ttf_free(table);
+}
+
 TTF_TABLE_CMAP* read_table_cmap(uint8_t* loc) {
     uint32_t cur = 0;
-    TTF_TABLE_CMAP* table = calloc(1, sizeof(TTF_TABLE_CMAP));
+    TTF_TABLE_CMAP* table = ttf_malloc(sizeof(TTF_TABLE_CMAP));
     table->version = read_uint16(loc, &cur);
     table->encs_n = read_uint16(loc, &cur);
 
-    table->encs = (TTF_ENCODING_RECORD**) malloc(
+    table->encs = (TTF_ENCODING_RECORD**) ttf_malloc(
         table->encs_n * sizeof(TTF_ENCODING_RECORD*));
 
     for (uint16_t i = 0; i < table->encs_n; i++) {
-        TTF_ENCODING_RECORD* record = (TTF_ENCODING_RECORD*) malloc(
+        TTF_ENCODING_RECORD* record = (TTF_ENCODING_RECORD*) ttf_malloc(
             sizeof(TTF_ENCODING_RECORD));
         record->platform = read_uint16(loc, &cur);
         record->enc_id = read_uint16(loc, &cur);
         record->offset = read_uint32(loc, &cur);
-        printf("Found record at 0x%x", record->offset);
         table->encs[i] = record;
     }
 
+    table->encoding = NULL;
+    table->format = -1;
+    table->free = &free_table_cmap;
     return table;
 }
 
 TTF_CMAP_FMT4* read_cmap4(uint8_t* loc) {
-    TTF_CMAP_FMT4* fmt = malloc(sizeof(TTF_CMAP_FMT4));
+    TTF_CMAP_FMT4* fmt = ttf_malloc(sizeof(TTF_CMAP_FMT4));
     uint32_t cur = 0;
     fmt->format         = read_uint16(loc, &cur);
     fmt->len            = read_uint16(loc, &cur);
@@ -172,41 +187,40 @@ TTF_CMAP_FMT4* read_cmap4(uint8_t* loc) {
 
     uint32_t seg_n      = fmt->seg_n2 / 2;
 
-    fmt->end_c = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    fmt->end_c = (uint16_t*) ttf_malloc(seg_n * sizeof(uint16_t));
     for (uint32_t i = 0; i < seg_n; i++) 
         fmt->end_c[i] = read_uint16(loc, &cur);
 
     fmt->reserved       = read_uint16(loc, &cur);
 
-    fmt->start_c = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    fmt->start_c = (uint16_t*) ttf_malloc(seg_n * sizeof(uint16_t));
     for (uint32_t i = 0; i < seg_n; i++) 
         fmt->start_c[i] = read_uint16(loc, &cur);
 
-    fmt->id_delta = (int16_t*) malloc(seg_n * sizeof(int16_t));
+    fmt->id_delta = (int16_t*) ttf_malloc(seg_n * sizeof(int16_t));
     for (uint32_t i = 0; i < seg_n; i++) 
         fmt->id_delta[i] = read_int16(loc, &cur);
 
-    fmt->id_rng_offset = (uint16_t*) malloc(seg_n * sizeof(uint16_t));
+    fmt->id_rng_offset = (uint16_t*) ttf_malloc(seg_n * sizeof(uint16_t));
     for (uint32_t i = 0; i < seg_n; i++) 
         fmt->id_rng_offset[i] = read_uint16(loc, &cur);
     
     fmt->id_arr_n = fmt->len - cur;
-    fmt->id_arr = (uint16_t*) malloc(fmt->id_arr_n * sizeof(uint16_t)); 
-    for (uint16_t i = 0; i < fmt->id_arr_n; i++) {
+    fmt->id_arr = (uint16_t*) ttf_malloc(fmt->id_arr_n * sizeof(uint16_t)); 
+    for (uint16_t i = 0; i < fmt->id_arr_n; i++) 
         fmt->id_arr[i] = read_uint16(loc, &cur);
-    }
 
     return fmt;
 }
 
 TTF_GLYF* read_glyf(uint8_t* loc) {
     uint32_t cur = 0;
-    TTF_GLYF* table = malloc(sizeof(TTF_GLYF));
+    TTF_GLYF* table = ttf_malloc(sizeof(TTF_GLYF));
     table->cont_n = read_int16(loc, &cur);
-    table->x_min = read_int16(loc, &cur);
-    table->y_min = read_int16(loc, &cur);
-    table->x_max = read_int16(loc, &cur);
-    table->y_max = read_int16(loc, &cur);
+    table->x_min  = read_int16(loc, &cur);
+    table->y_min  = read_int16(loc, &cur);
+    table->x_max  = read_int16(loc, &cur);
+    table->y_max  = read_int16(loc, &cur);
     return table;
 }
 
@@ -243,14 +257,24 @@ void read_coords(TTF_GLYF_SIMP_D* gdata,
     }
 }
 
+void free_sgdata(TTF_GLYF_SIMP_D* gdata) {
+    ttf_free(gdata->cont_endpts);        
+    ttf_free(gdata->flags);
+    ttf_free(gdata->x_coords);
+    ttf_free(gdata->y_coords);
+    if (gdata->instr_n != 0) 
+        ttf_free(gdata->instr);        
+    ttf_free(gdata); 
+}
+
 TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
     uint32_t cur = 0;
 
-    TTF_GLYF_SIMP_D* gdata = (TTF_GLYF_SIMP_D*) malloc(
+    TTF_GLYF_SIMP_D* gdata = (TTF_GLYF_SIMP_D*) ttf_malloc(
             sizeof(TTF_GLYF_SIMP_D));
 
     // read contour endpoint indices and find max idx
-    gdata->cont_endpts = (uint16_t*) malloc(
+    gdata->cont_endpts = (uint16_t*) ttf_malloc(
             header->cont_n * sizeof(uint16_t));
     uint32_t max_idx = 0;
     for (uint16_t i = 0; i < header->cont_n; i++) {
@@ -261,20 +285,17 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
     gdata->cont_n = header->cont_n;
     gdata->coords_n = max_idx + 1;
 
-    printf("%d COORD_NX. cont_n%d, ", gdata->coords_n, header->cont_n);
-    fflush(stdout);
-
     // read bytecode instructions
     gdata->instr_n = read_uint16(loc, &cur);
     gdata->instr = NULL;
     if (gdata->instr_n > 0) {
-        gdata->instr = (uint8_t*) malloc(
+        gdata->instr = (uint8_t*) ttf_malloc(
                 gdata->instr_n * sizeof(uint8_t));
         for (uint16_t i = 0; i < gdata->instr_n; i++) 
             gdata->instr[i] = read_uint8(loc, &cur);
     }
     
-    gdata->flags = (uint8_t*) malloc((gdata->coords_n) * sizeof(uint8_t));
+    gdata->flags = (uint8_t*) ttf_malloc((gdata->coords_n) * sizeof(uint8_t));
 
     // populate flags 
     for (uint16_t i = 0; i < gdata->coords_n; ) {
@@ -284,9 +305,9 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
         while (reps-- > 0) gdata->flags[i++] = flag;
     }
 
-    gdata->x_coords = (int16_t*) malloc(
+    gdata->x_coords = (int16_t*) ttf_malloc(
         gdata->coords_n * sizeof(int16_t));
-    gdata->y_coords = (int16_t*) malloc(
+    gdata->y_coords = (int16_t*) ttf_malloc(
         gdata->coords_n * sizeof(int16_t));
 
     read_coords(gdata, gdata->x_coords, loc, &cur,
@@ -294,5 +315,6 @@ TTF_GLYF_SIMP_D* read_glyf_simp_d(uint8_t* loc, TTF_GLYF* header) {
     read_coords(gdata, gdata->y_coords, loc, &cur,
             F_Y_SHORT_VECTOR, F_Y_IS_SAME_OR_POSITIVE_Y_SHORT_VECTOR);
 
+    gdata->free = &free_sgdata;
     return gdata;
 }

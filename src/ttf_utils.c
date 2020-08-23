@@ -58,18 +58,33 @@ uint32_t calc_checksum(uint8_t *table, uint32_t len)
 
 void ttf_log(const char *format, ...)
 {
+#ifdef USE_STDLIB
     va_list args;
     va_start(args, format);
 
 #ifdef VERBOSE_PARSE
     vprintf(format, args);
 #endif
+    va_end(args);
+#endif
+}
+
+void ttf_error(const char* format, ...) {
+#ifdef USE_STDLIB
+    va_list args;
+    va_start(args, format);
+
+#ifndef SILENCE_ERROR
+    vprintf(format, args);
+#endif
 
     va_end(args);
+#endif
 }
 
 void ttf_log_r(const char *format, ...)
 {
+#ifdef USE_STDLIB
     va_list args;
     va_start(args, format);
 
@@ -78,4 +93,5 @@ void ttf_log_r(const char *format, ...)
 #endif
 
     va_end(args);
+#endif
 }
