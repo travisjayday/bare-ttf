@@ -1,11 +1,7 @@
 #ifndef TTF_RASTER
 #define TTF_RASTER
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-
+#include "ttf_libc.h"
 #include "ttf_tables.h"
 #include "ttf_utils.h"
 

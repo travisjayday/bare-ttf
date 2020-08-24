@@ -1,5 +1,5 @@
 #ifndef TTF_UTILS_H
-#define TTF_UTILS
+#define TTF_UTILS_H
 
 #include "ttf_libc.h"
 

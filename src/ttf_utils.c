@@ -58,40 +58,78 @@ uint32_t calc_checksum(uint8_t *table, uint32_t len)
 
 void ttf_log(const char *format, ...)
 {
-#ifdef USE_STDLIB
     va_list args;
     va_start(args, format);
 
 #ifdef VERBOSE_PARSE
+
+#ifdef USE_GNUEFI
+    uint32_t p = 0;
+    while (*(format + p++) != '\0');
+    CHAR16 * _format = (CHAR16*) ttf_malloc(p * sizeof(CHAR16));
+    p = 0; 
+    do _format[p] = format[p];
+    while (format[p++] != '\0');
+    //ttf_free(_format);
+    VPrint(_format, args);
+#endif
+
+#ifdef USE_STDLIB
     vprintf(format, args);
 #endif
-    va_end(args);
+
 #endif
+    va_end(args);
 }
 
-void ttf_error(const char* format, ...) {
-#ifdef USE_STDLIB
+void ttf_error(const char *format, ...)
+{
     va_list args;
     va_start(args, format);
 
-#ifndef SILENCE_ERROR
+#ifdef VERBOSE_PARSE
+
+#ifdef USE_GNUEFI
+    uint32_t p = 0;
+    while (*(format + p++) != '\0');
+    CHAR16 * _format = (CHAR16*) ttf_malloc(p * sizeof(CHAR16));
+    p = 0; 
+    do _format[p] = format[p];
+    while (format[p++] != '\0');
+    //ttf_free(_format);
+    VPrint(_format, args);
+#endif
+
+#ifdef USE_STDLIB
     vprintf(format, args);
 #endif
 
-    va_end(args);
 #endif
+    va_end(args);
 }
 
 void ttf_log_r(const char *format, ...)
 {
-#ifdef USE_STDLIB
     va_list args;
     va_start(args, format);
 
 #ifdef VERBOSE_RASTR
+
+#ifdef USE_GNUEFI
+    uint32_t p = 0;
+    while (*(format + p++) != '\0');
+    CHAR16 * _format = (CHAR16*) ttf_malloc(p * sizeof(CHAR16));
+    p = 0; 
+    do _format[p] = format[p];
+    while (format[p++] != '\0');
+    //ttf_free(_format);
+    VPrint(_format, args);
+#endif
+
+#ifdef USE_STDLIB
     vprintf(format, args);
 #endif
 
-    va_end(args);
 #endif
+    va_end(args);
 }

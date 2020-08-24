@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -I./include
+CFLAGS=-g -I./include -I/usr/include/efi/x86_64 -I/usr/include/efi
 build_path = ./build
 src_path = ./src
 example_path = ./example

@@ -33,7 +33,7 @@ void free_font(TTF_FONT* font) {
 }
 
    
-void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out) {
+void extract_font_from_bytes(uint8_t* ttf_buffer, TTF_FONT** font_out) {
     uint8_t* buf = ttf_buffer; 
     uint32_t cur = 4;
 
@@ -257,7 +257,7 @@ void extract_font_from_file(char* fname, TTF_FONT** font) {
     ttf_log("Read %d", size);
     fclose(ttf_file); 
 
-    extract_glyfs(buf, font);
+    extract_font_from_bytes(buf, font);
 
     ttf_free(buf);
 #else

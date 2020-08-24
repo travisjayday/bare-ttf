@@ -14,7 +14,7 @@ typedef struct TTF_FONT {
     void (*free)(struct TTF_FONT*);
 } TTF_FONT;
 
-void extract_glyfs(uint8_t* ttf_buffer, TTF_FONT** font_out);
+void extract_font_from_bytes(uint8_t* ttf_buffer, TTF_FONT** font_out);
 
 TTF_GLYF* glyf_from_char(TTF_FONT* font, uint8_t ch);
 

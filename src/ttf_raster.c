@@ -14,7 +14,7 @@ typedef struct {
 } _POINT;
 
 #define add_line(_x0, _y0, _x1, _y1) \
-        _LINE* l = (_LINE*) malloc(sizeof(_LINE)); \
+        _LINE* l = (_LINE*) ttf_malloc(sizeof(_LINE)); \
         l->x0 = _x0; \
         l->y0 = _y0; \
         l->x1 = _x1; \
@@ -65,8 +65,8 @@ void sort(float* arr, uint16_t n)
 
 
 void free_pixbuf(GLYF_PIXBUF* px) {
-    free(px->buf);
-    free(px);
+    ttf_free(px->buf);
+    ttf_free(px);
 }
 
 
@@ -188,6 +188,7 @@ void draw_line(GLYF_PIXBUF* px, float x0, float y0, float x1, float y1) {
 // main rasterization function 
 GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
 
+    ttf_log_r("Allocating for Glyf 0x%x", glyf);
     if (glyf->cont_n <= 0) return NULL; 
 
     float offset_x = -glyf->x_min;
@@ -197,11 +198,11 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     int16_t x_max = (float) glyf->x_max / scale_f + 0.5f;
     int16_t y_max = (float) glyf->y_max / scale_f + 0.5f;
 
-    GLYF_PIXBUF* pixbuf = (GLYF_PIXBUF*) malloc(sizeof(GLYF_PIXBUF));
+    GLYF_PIXBUF* pixbuf = (GLYF_PIXBUF*) ttf_malloc(sizeof(GLYF_PIXBUF));
     pixbuf->w = (float) (x_max - x_min + 1) + 0.5f;
     pixbuf->h = (float) (y_max - y_min + 1) + 0.5f;
     pixbuf->shift_y = -glyf->y_min / scale_f - pixbuf->h;
-    pixbuf->buf = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
+    pixbuf->buf = ttf_malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
     pixbuf->free = &free_pixbuf;
 
     ttf_log_r("cont_n: %d\n; x: [%d, %d], y: [%d, %d]\n", glyf->cont_n, 
@@ -226,7 +227,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     ttf_log_r("grid-width: %d x %d, grid-x: [%d, %d], grid-y: [%d, %d], offset: [%f, %f]\n", 
             pixbuf->w, pixbuf->h, x_min, x_max, y_min, y_max, offset_x, offset_y);
 
-    _LINE** lines = (_LINE**) malloc((gdata->coords_n * 2 * 2 + 1) * sizeof(_LINE*));
+    _LINE** lines = (_LINE**) ttf_malloc((gdata->coords_n * 2 * 2 + 1) * sizeof(_LINE*));
     uint16_t line_n = 0;
 
     for (uint16_t i = 0; i < gdata->coords_n; i++) {
@@ -302,7 +303,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     
     // points in blacklist are not allowed to be valid x intercepts for 
     // scanline rasterization
-    _POINT** blacklist = (_POINT**) malloc((line_n + 1) * sizeof(_POINT*));
+    _POINT** blacklist = (_POINT**) ttf_malloc((line_n + 1) * sizeof(_POINT*));
     uint16_t blacklist_n = 0;
     for (uint16_t i = 0; i < line_n; i++) {
         _LINE* li = lines[i];
@@ -313,7 +314,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
         // add singular vertices at ^ or v
         if ((li->y0 <= li->y1 && lo->y1 <= li->y1) 
             || (li->y0 >= li->y1 && lo->y1 >= li->y1)) {
-            _POINT* p = malloc(sizeof(_POINT));
+            _POINT* p = ttf_malloc(sizeof(_POINT));
             p->x = lines[i]->x1;
             p->y = lines[i]->y1;
             blacklist[blacklist_n++] = p;
@@ -323,7 +324,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
     // Find x-intercepts between lines
     ttf_log_r("colected %d lines\n", line_n);
     for (uint16_t y = 0; y < pixbuf->h; y++) {
-        float* x_ints = (float*) malloc((pixbuf->w) * sizeof(float));
+        float* x_ints = (float*) ttf_malloc((pixbuf->w) * sizeof(float));
         uint16_t x_ints_n = 0;
         ttf_log_r("Considering y=%d\n\n", y);
         for (uint16_t i = 0; i < line_n; i++) {
@@ -374,7 +375,7 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
 
         float dinc = 0.1f;
         do {
-            float* filtered_x = (float*) malloc((pixbuf->w) * sizeof(float));
+            float* filtered_x = (float*) ttf_malloc((pixbuf->w) * sizeof(float));
             uint16_t m = 0;
 
             for (uint16_t i = 0; i < x_ints_n; i++) {
@@ -384,8 +385,8 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
                     if (absdiff(y, blacklist[j]->y) < (0.05f + dinc)) {
                         float d2 = (x_i - blacklist[j]->x) 
                                  * (x_i - blacklist[j]->x);
-                                 /*+ (y - blacklist[j]->y) * 0.001
-                                 * (y - blacklist[j]->y);*/
+                                 //+ (y - blacklist[j]->y) * 0.001
+                                 // * (y - blacklist[j]->y);
                         if (absdiff(x_i, blacklist[j]->x) < (0.2f + dinc)) {
                             ttf_log_r("SKIPPING %f because of (%f, %f) on y=%d\n",
                                 x_i, blacklist[j]->x, blacklist[j]->y, y);
@@ -402,13 +403,13 @@ GLYF_PIXBUF* rasterize_glyf(TTF_GLYF* glyf, float scale_f) {
 blacklisted:
                 0 == 0;
             }
-            free(x_ints);
+            ttf_free(x_ints);
             x_ints = filtered_x;
             x_ints_n = m;
             dinc += 0.1f;
         } while (x_ints_n % 2 != 0 && dinc < 10.f);
 
-        if (x_ints_n % 2 != 0) printf("GAVE UP");
+        if (x_ints_n % 2 != 0) ttf_log_r("GAVE UP");
 
         // scanline color between consecutive x intercepts
         for (uint16_t i = 0; i < x_ints_n; i += 2) {
@@ -481,7 +482,7 @@ blacklisted:
  
 
     // reflect the shape vertically 
-    uint8_t* ref = malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
+    uint8_t* ref = ttf_malloc(pixbuf->w * pixbuf->h * sizeof(uint8_t));
     for (uint16_t r = 0; r < pixbuf->h; r++) {
         for (uint16_t c = 0; c < pixbuf->w; c++) {
             ref[(pixbuf->h - r - 1) * pixbuf->w + c] = pixbuf->buf[r * pixbuf->w + c];
@@ -490,17 +491,17 @@ blacklisted:
     }
     ttf_log_r("----------------");
 
-    free(pixbuf->buf);
+    ttf_free(pixbuf->buf);
     pixbuf->buf = ref;
 
     // print glyfph
     printbuf(pixbuf);
 
-    for (uint16_t i = 0; i < blacklist_n; i++) free(blacklist[i]);
-    free(blacklist);
+    for (uint16_t i = 0; i < blacklist_n; i++) ttf_free(blacklist[i]);
+    ttf_free(blacklist);
 
-    for (uint16_t i = 0; i < line_n; i++) free(lines[i]);
-    free(lines);
+    for (uint16_t i = 0; i < line_n; i++) ttf_free(lines[i]);
+    ttf_free(lines);
 
     // return glyf pixel buffer
     return pixbuf;
