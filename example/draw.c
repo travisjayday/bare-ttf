@@ -81,8 +81,8 @@ void draw_string(cairo_t* cr, char* str, uint16_t x, uint16_t y, TTF_FONT* font,
 
         if (glyf->cont_n != 0) {
             draw_glyf(cr, pixbuf, x, y + pixbuf->shift_y);
-            printf("%c -> y:[%d, %d] -> v_shift: %d, bearings: [%d, %d]\n", 
-                str[i], glyf->y_min, glyf->y_max, pixbuf->shift_y, glyf->lsb, rsb);
+            printf("%c -> y:[%d, %d] -> v_shift: %d, bearings: [%d, %d], dimen: [%d x %d]\n", 
+                str[i], glyf->y_min, glyf->y_max, pixbuf->shift_y, glyf->lsb, rsb, pixbuf->w, pixbuf->h);
             x += pixbuf->w;
             pixbuf->free(pixbuf);
         }
@@ -113,11 +113,23 @@ static void paint (GtkWidget *widget, GdkEventExpose *eev, gpointer data) {
 
     if (drawed == 0) {
         drawed = 1;
+        //GLYF_PIXBUF* pixbuf = rasterize_glyf(font->glyfs[22], font->head->units_per_em / 30.0f);
+        //draw_glyf(cr, pixbuf, 100, 100); 
+        draw_string(cr, "j", 20, 120, font, 30.0f);
         draw_string(cr, "The quick brown fox jumps over the hedge!", 20, 120, font, 30.0f);
         draw_string(cr, "Hellow, world!", 20, 220, font, 80.0f);
-        draw_string(cr, "abcdefghijklmnopqrstuvwxyz1234567890[]/&,.!\\?", 20, 320, font, 25.0f);
+        draw_string(cr, "abcdefghijklmnopqrstuvwxyz1234567890[]/&,.!\\?", 20, 320, font, 18.0f);
+        draw_string(cr, "The quick brown fox jumps over the hedge!", 20, 520, font, 15.0f);
+        draw_string(cr, "The quick brown fox jumps over the hedge!", 20, 570, font, 10.0f);
         draw_string(cr, "Hellow, world!", 20, 420, font, 100.0f);
         font->free(font);
+
+        cairo_set_source_rgb(cr, 1.0f, 20.f, 20.f);
+        cairo_set_line_width (cr, 1);
+        cairo_move_to(cr, 20, 320);
+        cairo_line_to(cr, 400, 320);
+        cairo_stroke(cr);
+ 
     }
     cairo_destroy (cr);
 }

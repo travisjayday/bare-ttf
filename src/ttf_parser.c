@@ -34,6 +34,11 @@ void free_font(TTF_FONT* font) {
 
    
 void extract_font_from_bytes(uint8_t* ttf_buffer, TTF_FONT** font_out) {
+    ttf_log("Preparing to read font from 0x%x\n", ttf_buffer);
+    if (ttf_buffer == NULL || font_out == NULL) {
+        ttf_error("Buffers cannot be NULL\n");
+        return;
+    }
     uint8_t* buf = ttf_buffer; 
     uint32_t cur = 4;
 

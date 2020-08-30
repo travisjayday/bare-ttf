@@ -1,8 +1,8 @@
 #ifndef TTF_LIBC
 #define TTF_LIBC
 
-#define USE_GNUEFI
-//#define USE_STDLIB
+//#define USE_GNUEFI
+#define USE_STDLIB
 
 
 #ifdef USE_STDLIB
@@ -17,6 +17,7 @@
 #include <efistdarg.h>
 #include <efibind.h>
 #include <efilib.h>
+extern void* _malloc(UINTN size);
 #endif
 
 void* ttf_malloc(uint32_t size);

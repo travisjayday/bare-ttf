@@ -3,7 +3,7 @@
 
 #include "ttf_libc.h"
 
-#define VERBOSE_PARSE
+//#define VERBOSE_PARSE
 //#define VERBOSE_RASTR
 //#define SILENCE_ERROR
 
